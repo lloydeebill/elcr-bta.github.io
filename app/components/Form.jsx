@@ -107,6 +107,7 @@ function Form() {
 						contact: values.contact,
 						registrants_valid_id: registrantIdUrl,
 						email: user?.email || null,
+						user_id: user?.id,
 					},
 				])
 				.select("id");
