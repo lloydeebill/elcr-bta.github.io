@@ -96,6 +96,8 @@ function Form() {
 				"ids/registrants"
 			);
 
+			console.log("USER ID:", user?.id);
+
 			// Insert into registrants table
 			const { data: registrantData, error: registrantError } = await supabase
 				.from("registrants")
