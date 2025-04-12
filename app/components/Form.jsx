@@ -105,7 +105,7 @@ function Form() {
 						relationship: values.relationship,
 						address: values.address,
 						contact: values.contact,
-						valid_id: registrantIdUrl,
+						registrants_valid_id: registrantIdUrl,
 						email: user?.email || null,
 					},
 				])
