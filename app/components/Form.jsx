@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import { useState } from "react";
 import { uploadFile } from "@/utils/uploadFile";
+import RegistrantFields from "./RegistrantFields";
 
 function Form() {
 	const [values, setValues] = useState({
@@ -8,7 +9,7 @@ function Form() {
 		relationship: "",
 		address: "",
 		contact: "",
-		image_url: "",
+		registrants_valid_id: "",
 		child_firstname: "",
 		child_middlename: "",
 		child_lastname: "",
@@ -58,6 +59,21 @@ function Form() {
 		consent: "",
 	});
 
+	const [user, setUser] = useState(null);
+
+	const [isSubmitting, setIsSubmitting] = useState(false);
+
+	useEffect(() => {
+		const getUser = async () => {
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+			setUser(session?.user || null);
+		};
+
+		getUser();
+	}, []);
+
 	const handleChanges = (e) => {
 		const { name, type, files, value } = e.target;
 		setValues({
@@ -69,85 +85,122 @@ function Form() {
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 
-		const imageUrl = await uploadFile(values.image, "images");
-		const marriageCertUrl = await uploadFile(
-			values.marriage_certificate,
-			"certificates"
-		);
-		const fatherIdUrl = await uploadFile(values.father_valid_id, "ids/father");
-		const motherIdUrl = await uploadFile(values.mother_valid_id, "ids/mother");
-		const { error } = await supabase.from("birth_registration").insert([
-			{
-				fullname: values.fullname,
-				relationship: values.relationship,
-				address: values.address,
-				contact: values.contact,
-				image_url: imageUrl,
-				child_firstname: values.child_firstname,
-				child_middlename: values.child_middlename,
-				child_lastname: values.child_lastname,
-				sex: values.sex,
-				attendant_name: values.attendant_name,
-				attendant_address: values.attendant_address,
-				attendant_position: values.attendant_position,
-				birthdate: values.birthdate,
-				birthplace: values.birthplace,
-				type_of_birth: values.type_of_birth,
-				type_of_birth_other: values.type_of_birth_other,
-				multiple_birth_order: values.multiple_birth_order,
-				multiple_birth_order_other: values.multiple_birth_order_other,
-				birth_order: values.birth_order,
-				birth_order_other: values.birth_order_other,
-				birth_weight: values.birth_weight,
-				attendant: values.attendant,
-				parents_married: values.parents_married,
-				marriage_date: values.marriage_date,
-				marriage_city: values.marriage_city,
-				marriage_province: values.marriage_province,
-				marriage_country: values.marriage_country,
-				marriage_certificate: marriageCertUrl,
-				father_firstname: values.father_firstname,
-				father_middlename: values.father_middlename,
-				father_lastname: values.father_lastname,
-				father_nationality: values.father_nationality,
-				father_religion: values.father_religion,
-				father_occupation: values.father_occupation,
-				father_age_at_birth: values.father_age_at_birth,
-				father_dob: values.father_dob,
-				father_residence: values.father_residence,
-				father_valid_id: fatherIdUrl,
-				mother_firstname: values.mother_firstname,
-				mother_middlename: values.mother_middlename,
-				mother_lastname: values.mother_lastname,
-				mother_nationality: values.mother_nationality,
-				mother_religion: values.mother_religion,
-				mother_occupation: values.mother_occupation,
-				mother_age_at_birth: values.mother_age_at_birth,
-				mother_dob: values.mother_dob,
-				mother_residence: values.mother_residence,
-				mother_valid_id: motherIdUrl,
-				children_born_alive: values.children_born_alive,
-				children_still_living: values.children_still_living,
-				children_deceased: values.children_deceased,
-				consent: values.consent,
-			},
-		]);
+		setIsSubmitting(true);
 
-		if (error) {
-			console.error("Insert error:", error.message);
-		} else {
+		try {
+			// Upload registrant's ID first
+			const registrantIdUrl = await uploadFile(
+				values.registrants_valid_id,
+				"ids/registrants"
+			);
+
+			// Insert into registrants table
+			const { data: registrantData, error: registrantError } = await supabase
+				.from("registrants")
+				.insert([
+					{
+						fullname: values.fullname,
+						relationship: values.relationship,
+						address: values.address,
+						contact: values.contact,
+						valid_id: registrantIdUrl,
+						email: user?.email || null,
+					},
+				])
+				.select("id");
+
+			if (registrantError) throw registrantError;
+
+			const registrant_id = registrantData?.[0]?.id;
+
+			// Upload certificate files
+			const marriageCertUrl = await uploadFile(
+				values.marriage_certificate,
+				"certificates"
+			);
+			const fatherIdUrl = await uploadFile(
+				values.father_valid_id,
+				"ids/father"
+			);
+			const motherIdUrl = await uploadFile(
+				values.mother_valid_id,
+				"ids/mother"
+			);
+
+			// Insert into birth_registration
+			const { error: birthError } = await supabase
+				.from("birth_registration")
+				.insert([
+					{
+						registrant_id,
+						child_firstname: values.child_firstname,
+						child_middlename: values.child_middlename,
+						child_lastname: values.child_lastname,
+						sex: values.sex,
+						birthdate: values.birthdate,
+						birthplace: values.birthplace,
+						type_of_birth: values.type_of_birth,
+						type_of_birth_other: values.type_of_birth_other,
+						multiple_birth_order: values.multiple_birth_order,
+						multiple_birth_order_other: values.multiple_birth_order_other,
+						birth_order: values.birth_order,
+						birth_order_other: values.birth_order_other,
+						birth_weight: values.birth_weight,
+						attendant: values.attendant,
+						attendant_name: values.attendant_name,
+						attendant_position: values.attendant_position,
+						attendant_address: values.attendant_address,
+						parents_married: values.parents_married,
+						marriage_date: values.marriage_date,
+						marriage_city: values.marriage_city,
+						marriage_province: values.marriage_province,
+						marriage_country: values.marriage_country,
+						marriage_certificate: marriageCertUrl,
+						father_firstname: values.father_firstname,
+						father_middlename: values.father_middlename,
+						father_lastname: values.father_lastname,
+						father_nationality: values.father_nationality,
+						father_religion: values.father_religion,
+						father_occupation: values.father_occupation,
+						father_age_at_birth: values.father_age_at_birth,
+						father_dob: values.father_dob,
+						father_residence: values.father_residence,
+						father_valid_id: fatherIdUrl,
+						mother_firstname: values.mother_firstname,
+						mother_middlename: values.mother_middlename,
+						mother_lastname: values.mother_lastname,
+						mother_nationality: values.mother_nationality,
+						mother_religion: values.mother_religion,
+						mother_occupation: values.mother_occupation,
+						mother_age_at_birth: values.mother_age_at_birth,
+						mother_dob: values.mother_dob,
+						mother_residence: values.mother_residence,
+						mother_valid_id: motherIdUrl,
+						children_born_alive: values.children_born_alive,
+						children_still_living: values.children_still_living,
+						children_deceased: values.children_deceased,
+						consent: values.consent,
+					},
+				]);
+
+			if (birthError) throw birthError;
+
 			alert("Form details submitted, thank you for using iRegistry!");
-			ResetFun(); // Optional: clear form after submission
+		} catch (err) {
+			setIsSubmitting(false);
+			console.error("Submission error:", err.message);
+			alert("Something went wrong. Check the console for details.");
+			ResetForm();
 		}
 	};
 
-	const ResetFun = () => {
+	const ResetForm = () => {
 		setValues({
 			fullname: "",
 			relationship: "",
 			address: "",
 			contact: "",
-			image: null,
+			registrants_valid_id: "",
 			child_firstname: "",
 			child_middlename: "",
 			child_lastname: "",
@@ -206,77 +259,7 @@ function Form() {
 			<hr className="my-4 border-t-4 border-gray-700" />
 
 			<form onSubmit={handleSubmit} className="space-y-4">
-				<div>
-					<label className="text-sm font-bold text-gray-600 block mb-1">
-						Full Name (Pangalan ng nagparehistro):
-					</label>
-					<input
-						type="text"
-						placeholder="Juan Dela Cruz Jr."
-						name="fullname"
-						onChange={handleChanges}
-						required
-						value={values.fullname}
-						className="block w-full p-2 rounded text-sm border border-gray-300"
-					/>
-				</div>
-
-				<div>
-					<label className="text-sm font-bold text-gray-600 block mb-1">
-						Relationship with the child/person to be registered:
-					</label>
-					<input
-						type="text"
-						placeholder="Parent"
-						name="relationship"
-						onChange={handleChanges}
-						required
-						value={values.relationship}
-						className="block w-full p-2 rounded text-sm border border-gray-300"
-					/>
-				</div>
-
-				<div>
-					<label className="text-sm font-bold text-gray-600 block mb-1">
-						Address:
-					</label>
-					<input
-						type="text"
-						placeholder="Enter Address"
-						name="address"
-						onChange={handleChanges}
-						required
-						value={values.address}
-						className="block w-full p-2 rounded text-sm border border-gray-300"
-					/>
-				</div>
-
-				<div>
-					<label className="text-sm font-bold text-gray-600 block mb-1">
-						Contact:
-					</label>
-					<input
-						type="text"
-						placeholder="Enter Phone Number"
-						name="contact"
-						onChange={handleChanges}
-						required
-						value={values.contact}
-						className="block w-full p-2 rounded text-sm border border-gray-300"
-					/>
-				</div>
-
-				<div>
-					<label className="text-sm font-bold text-gray-600 block mb-1">
-						Upload Valid ID:
-					</label>
-					<input
-						type="file"
-						name="image"
-						onChange={handleChanges}
-						className="block w-full text-sm"
-					/>
-				</div>
+				<RegistrantFields values={values} handleChanges={handleChanges} />
 
 				{/* Additional Registration Details */}
 
@@ -1164,6 +1147,7 @@ function Form() {
 
 				<div className="flex justify-center mt-4">
 					<button
+						disabled={isSubmitting}
 						type="submit"
 						className="px-4 py-2 rounded-md text-white bg-[#4206a3] hover:bg-blue-400 w-2/5"
 					>
