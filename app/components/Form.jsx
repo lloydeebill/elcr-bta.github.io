@@ -1,5 +1,7 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useState } from "react";
 import { uploadFile } from "@/utils/uploadFile";
 import RegistrantFields from "./RegistrantFields";
 
